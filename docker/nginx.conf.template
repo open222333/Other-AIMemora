@@ -1,0 +1,33 @@
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # API 反向代理（API_UPSTREAM 由環境變數設定，例如 http://api:8000）
+    location /api/ {
+        proxy_pass ${API_UPSTREAM};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+    }
+
+    # 帶 hash 的靜態資源長期快取
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        try_files $uri =404;
+    }
+
+    # SPA：未知路徑回 index.html
+    location / {
+        add_header Cache-Control "no-cache";
+        try_files $uri $uri/ /index.html;
+    }
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+}

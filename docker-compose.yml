@@ -1,18 +1,71 @@
+# MEMORA 自架部署：cp .env.example .env → 修改密碼與密鑰 → docker compose up -d --build
+# 預設只綁定 127.0.0.1；遠端存取請另外設定 TLS、認證與防火牆。
+name: memora
+
 services:
-  web:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-      args:
-        VITE_APP_NAME: "${VITE_APP_NAME:-Dashboard}"
-        # 沒有後端時設 true，以 mock API 展示
-        VITE_API_MOCK: "${VITE_API_MOCK:-false}"
-    image: react-dashboard:latest
+  db:
+    image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
-      # 後端位址：同一個 compose 用 service 名稱；主機上的服務用 http://host.docker.internal:8000
-      API_UPSTREAM: "${API_UPSTREAM:-http://host.docker.internal:8000}"
+      POSTGRES_DB: memora
+      POSTGRES_USER: memora
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?請在 .env 設定 POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U memora -d memora"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build: ./backend
+    image: memora-api:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      MEMORA_ENV: production
+      # 分欄設定：密碼含 / + = @ 等字元也不會破壞連線字串
+      MEMORA_DB_HOST: db
+      MEMORA_DB_NAME: memora
+      MEMORA_DB_USER: memora
+      MEMORA_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      MEMORA_SECRET_KEY: ${MEMORA_SECRET_KEY:?請在 .env 設定 MEMORA_SECRET_KEY}
+      MEMORA_ADMIN_USERNAME: ${MEMORA_ADMIN_USERNAME:-admin}
+      MEMORA_ADMIN_PASSWORD: ${MEMORA_ADMIN_PASSWORD:-}
+      MEMORA_COOKIE_SECURE: ${MEMORA_COOKIE_SECURE:-false}
+      MEMORA_EMBEDDING_PROVIDER: ${MEMORA_EMBEDDING_PROVIDER:-disabled}
+      MEMORA_EMBEDDING_BASE_URL: ${MEMORA_EMBEDDING_BASE_URL:-http://host.docker.internal:11434/v1}
+      MEMORA_EMBEDDING_MODEL: ${MEMORA_EMBEDDING_MODEL:-nomic-embed-text}
+      MEMORA_EMBEDDING_API_KEY: ${MEMORA_EMBEDDING_API_KEY:-}
+      MEMORA_RATE_LIMIT_PER_MINUTE: ${MEMORA_RATE_LIMIT_PER_MINUTE:-120}
+      MEMORA_LOGIN_MAX_FAILURES: ${MEMORA_LOGIN_MAX_FAILURES:-10}
+      MEMORA_LOGIN_WINDOW_SECONDS: ${MEMORA_LOGIN_WINDOW_SECONDS:-300}
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    # 需要直接連 API（不經前端 nginx）時取消註解
+    # ports:
+    #   - "127.0.0.1:8000:8000"
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: docker/Dockerfile
+      args:
+        VITE_APP_NAME: MEMORA
+        VITE_API_MOCK: "false"
+    image: memora-web:latest
+    restart: unless-stopped
+    depends_on:
+      # 等 API 健康檢查通過才啟動；API 起不來時 docker compose up 會直接報錯，而不是只看到 502
+      api:
+        condition: service_healthy
+    environment:
+      API_UPSTREAM: http://api:8000
     ports:
       - "127.0.0.1:${WEB_PORT:-8080}:80"
+
+volumes:
+  pgdata:

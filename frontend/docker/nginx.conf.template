@@ -1,0 +1,43 @@
+server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # API 無法連線時顯示說明頁（而不是空白的 502）
+    error_page 502 503 504 = @api_down;
+    location @api_down {
+        default_type text/html;
+        add_header Cache-Control "no-store" always;
+        return 502 '<!doctype html><meta charset="utf-8"><title>MEMORA API 無法連線</title><body style="font-family:system-ui;max-width:40rem;margin:4rem auto;padding:0 1rem;line-height:1.6"><h1>MEMORA API 目前無法連線</h1><p>Web 介面正常，但後端 API 沒有回應。常見原因：</p><ol><li>API 仍在啟動或執行資料庫 migration，請稍候 30 秒再重新整理</li><li>設定錯誤導致 API 拒絕啟動，例如 <code>.env</code> 的 <code>MEMORA_SECRET_KEY</code> 仍是範例值</li><li>資料庫無法連線，或 <code>POSTGRES_PASSWORD</code> 與資料庫建立時不同</li></ol><p>查看原因：</p><pre style="background:#f3f4f6;padding:.75rem;border-radius:.5rem">docker compose ps<br>docker compose logs api --tail 50</pre></body>';
+    }
+
+    # API 反向代理（API_UPSTREAM 由環境變數設定，例如 http://api:8000）
+    location /api/ {
+        proxy_pass ${API_UPSTREAM};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        # nginx 為最外層：以實際連線 IP 覆寫，避免用戶端偽造 X-Forwarded-For 繞過登入節流
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+        client_max_body_size 25m;  # 匯入檔案上限（後端預設 20 MB）
+    }
+
+    # 帶 hash 的靜態資源長期快取
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        try_files $uri =404;
+    }
+
+    # SPA：未知路徑回 index.html
+    location / {
+        add_header Cache-Control "no-cache";
+        try_files $uri $uri/ /index.html;
+    }
+
+    gzip on;
+    gzip_types text/css application/javascript application/json image/svg+xml;
+}

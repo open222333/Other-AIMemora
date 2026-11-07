@@ -1,0 +1,99 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+/* ── MEMORA Design Tokens：所有顏色集中在這裡，頁面不可自行定義色碼 ──
+ * 規格：Background / Surface / Primary / Text Primary / Text Secondary / Border
+ */
+:root {
+  --radius: 0.625rem;
+  --background: #f6f7fb;
+  --foreground: #202638;
+  --card: #ffffff;
+  --card-foreground: #202638;
+  --popover: #ffffff;
+  --popover-foreground: #202638;
+  --primary: #7666e8;
+  --primary-foreground: #ffffff;
+  --secondary: #eef0f6;
+  --secondary-foreground: #202638;
+  --muted: #eef0f6;
+  --muted-foreground: #626d82;
+  --accent: #eeebfc;
+  --accent-foreground: #4b3dbf;
+  --destructive: #d93f3f;
+  --border: #e4e7ef;
+  --input: #e4e7ef;
+  --ring: #7666e8;
+  --sidebar: #ffffff;
+  /* 圖表：單一系列用 primary；格線一階離開表面 */
+  --chart-1: #7666e8;
+  --chart-grid: #e4e7ef;
+}
+
+.dark {
+  --background: #151923;
+  --foreground: #f4f6fc;
+  --card: #202738;
+  --card-foreground: #f4f6fc;
+  --popover: #202738;
+  --popover-foreground: #f4f6fc;
+  --primary: #7666e8;
+  --primary-foreground: #ffffff;
+  --secondary: #2a3247;
+  --secondary-foreground: #f4f6fc;
+  --muted: #2a3247;
+  --muted-foreground: #aab5c9;
+  --accent: #2e2a55;
+  --accent-foreground: #d4cffb;
+  --destructive: #f06a6a;
+  --border: #343b4d;
+  --input: #343b4d;
+  --ring: #8f82f0;
+  --sidebar: #1a1f2c;
+  --chart-1: #8f82f0;
+  --chart-grid: #343b4d;
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-chart-1: var(--chart-1);
+  --color-chart-grid: var(--chart-grid);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html,
+  body,
+  #root {
+    @apply h-full;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}

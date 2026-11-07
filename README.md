@@ -1,229 +1,178 @@
-# Template-ReactDashboard
+# MEMORA
 
-```
-React 後台 Dashboard 模板
-React + Vite + TypeScript + shadcn/ui：側欄 + 路由 + 資料表格 + API client，內建 mock API，不需後端即可開發
-```
+> **One Memory. Every AI.** — A Universal Memory Layer for Artificial Intelligence
 
-適用：管理後台、內部工具、SaaS Dashboard（例如 MEMORA 前端、Template-PythonFlaskAPI / Template-PythonVectorAPI 的管理介面）。
+自架式的跨 AI 共用記憶平台：使用者擁有一份長期記憶，ChatGPT、Claude、Gemini、DeepSeek 或本地模型在授權範圍內讀取與更新它。
 
-測試環境：Node 22
+目前進度：**Phase 1（MVP：核心記憶系統）**，並先提供 Phase 2 的 API Key 存取。產品規格見 [docs/MEMORA_UI_UX_產品規劃與開發規格.md](docs/MEMORA_UI_UX_產品規劃與開發規格.md)。
 
 ## 目錄
 
-- [功能](#功能)
-- [技術組合](#技術組合)
-- [目錄結構](#目錄結構)
-- [基於此模板建立新專案](#基於此模板建立新專案)
-- [本機執行](#本機執行)
-- [環境變數](#環境變數)
-- [串接後端](#串接後端)
-- [新增頁面](#新增頁面)
-- [新增資源（CRUD）](#新增資源crud)
-- [資料表格](#資料表格)
-- [登入與權限](#登入與權限)
-- [Docker](#docker)
-- [注意事項](#注意事項)
+- [快速開始（Docker Compose）](#快速開始docker-compose)
+- [專案結構](#專案結構)
+- [本機開發](#本機開發)
+- [功能與 API](#功能與-api)
+- [權限模型](#權限模型)
+- [搜尋](#搜尋)
+- [資料與安全](#資料與安全)
+- [開發進度](#開發進度)
 
-## 功能
+## 快速開始（Docker Compose）
 
-- **版面**：可收合側欄（狀態記憶）、手機版抽屜選單、頂欄麵包屑、⌘K 指令面板、淺色 / 深色 / 跟隨系統
-- **路由**：React Router（data router），未登入自動導向登入頁並帶回原網址，路由錯誤邊界、404
-- **API client**：自動帶 token、query string、逾時、錯誤訊息統一轉換、401 自動登出
-- **後端格式轉換集中在一個檔案**：同時相容 FastAPI（`access_token`、`detail`）與 Template-PythonFlaskAPI（`token`、`message`）
-- **Mock API**：`VITE_API_MOCK=true` 時前端內建假後端（登入、統計、專案 CRUD、權限），正式 build 完全不含 mock 程式碼
-- **資料表格**：伺服器端分頁 / 排序 / 搜尋 / 多選篩選，**狀態同步到網址**；勾選批次刪除、欄位顯示設定、骨架載入、空狀態、錯誤重試
-- **CRUD 範例**：專案列表 + 右側詳細面板（Inspector）+ 新增 / 編輯表單（react-hook-form + Zod，後端 422 錯誤回填欄位）+ 刪除確認
-- **權限**：依角色隱藏導覽項目與操作按鈕（viewer 唯讀）
-- **頁面**：登入、總覽（統計卡片、最近活動）、專案、設定、404
+```bash
+cp .env.example .env
+# 修改 POSTGRES_PASSWORD、MEMORA_SECRET_KEY（openssl rand -base64 32）、MEMORA_ADMIN_PASSWORD
+docker compose up -d --build
+```
 
-## 技術組合
+- Web UI：<http://localhost:8080>（只綁定 127.0.0.1）
+- API 文件：<http://localhost:8080/api/docs>
+- `MEMORA_ADMIN_PASSWORD` 留空時，初始密碼會印在 `docker compose logs api`
+- 資料存在 volume `pgdata`；備份：`docker compose exec db pg_dump -U memora memora > backup.sql`
 
-| 用途 | 套件 |
+### 疑難排解
+
+| 症狀 | 原因與處理 |
 |---|---|
-| 建置 | Vite、TypeScript |
-| UI | shadcn/ui（Radix）、Tailwind CSS v4、lucide-react、sonner |
-| 路由 | react-router v7 |
-| 伺服器狀態 | @tanstack/react-query v5 |
-| 表格 | @tanstack/react-table v8 |
-| 表單 | react-hook-form + zod v4 |
-| 用戶端狀態 | zustand（登入、側欄） |
-| 測試 | Vitest、Testing Library、jsdom |
+| `docker compose up` 顯示 `dependency failed to start: container ... api ... is unhealthy`，或網頁出現「MEMORA API 目前無法連線」 | 執行 `docker compose logs api --tail 50` 查看原因（以 `[MEMORA]` 開頭的訊息會說明怎麼修） |
+| `MEMORA_SECRET_KEY 仍是範例值` | 在 `.env` 設定 `MEMORA_SECRET_KEY=$(openssl rand -hex 32)` 的結果，再 `docker compose up -d` |
+| `資料庫 migration 失敗` / `password authentication failed` | `POSTGRES_PASSWORD` 只在資料庫**第一次**建立時生效。之後要改密碼：`docker compose exec db psql -U memora -c "ALTER USER memora PASSWORD '新密碼'"`，再更新 `.env`；或在確定不需要資料時 `docker compose down -v` 重建 |
+| 改了程式或 `.env` 沒生效 | 程式變更需 `docker compose up -d --build`；只改 `.env` 執行 `docker compose up -d` 即可 |
 
-## 目錄結構
+## 專案結構
 
 ```
-Template-ReactDashboard/
-├── docker/
-│   ├── Dockerfile                # node build → nginx
-│   └── nginx.conf.template       # SPA fallback + /api 反向代理（API_UPSTREAM）
-├── src/
-│   ├── api/
-│   │   ├── client.ts             # fetch 包裝、ApiError、configureClient()
-│   │   ├── adapters.ts           # ★ 後端回應格式轉換（串接後端只改這裡）
-│   │   ├── types.ts              # Paginated、ListParams、User、Session
-│   │   └── mock/                 # mock 後端：router、db（假資料）、路由定義
-│   ├── config/
-│   │   ├── env.ts                # VITE_* 環境變數
-│   │   └── nav.ts                # ★ 側欄導覽設定
-│   ├── features/                 # 依功能分：api（React Query hooks）、schema、元件
-│   │   ├── auth/                 # 登入 API、auth store、hasRole()
-│   │   ├── dashboard/
-│   │   └── projects/             # CRUD 範例：schema、api、表單、詳細面板、badge
-│   ├── pages/                    # 路由頁面
-│   ├── components/
-│   │   ├── ui/                   # shadcn/ui 元件
-│   │   ├── layout/               # AppLayout、Sidebar、Topbar、CommandMenu
-│   │   ├── data-table/           # DataTable、分頁、排序標題、篩選、欄位設定、勾選欄
-│   │   └── common/               # PageHeader、Empty / Error 狀態、ConfirmDialog
-│   ├── hooks/                    # useListParams（網址同步）、useDebouncedValue、useHotkeys
-│   ├── lib/                      # QueryClient、bootstrap、format、cn
-│   ├── router.tsx                # ★ 路由
-│   ├── __tests__/
-│   └── test/                     # 測試 setup、renderApp()
-├── .env.development              # npm run dev 用（預設 mock）
-├── .env.production               # npm run build 用
-├── components.json               # shadcn CLI 設定
-├── docker-compose.yml
-└── vite.config.ts                # @ 別名、/api dev proxy、Vitest
+Other-AIMemora/
+├── backend/                  # Python FastAPI（Modular Monolith）
+│   ├── memora/
+│   │   ├── api/              # 路由：auth、memories、sources、imports、export、dashboard、system
+│   │   ├── memory/           # Memory Engine：建立、更新、版本、去重、權限
+│   │   ├── retrieval/        # Hybrid Search、Embedding
+│   │   ├── importers/        # 匯入檔解析（Markdown / JSON / CSV / TXT）
+│   │   ├── security/         # 密碼、JWT、API Key、限流
+│   │   ├── models.py         # 資料表
+│   │   └── main.py
+│   ├── migrations/           # Alembic
+│   ├── tests/                # pytest（真實 PostgreSQL + pgvector）
+│   └── Dockerfile
+├── frontend/                 # React + Vite + TypeScript + shadcn/ui（見 frontend/README.md）
+├── docs/
+├── docker-compose.yml        # db（pgvector/pg16）+ api + web（nginx）
+└── .env.example
 ```
 
-## 基於此模板建立新專案
+> 規格書建議 Next.js；因自架場景不需要 SSR，沿用既有的 Vite + shadcn/ui Dashboard 模板（同樣是 React + TypeScript + Tailwind + shadcn/ui）。
+
+## 本機開發
+
+需求：Python 3.12+、Node 22、PostgreSQL 16 + pgvector（或用 `docker compose up -d db` 只啟動資料庫，並在 compose 中開放 5432）。
 
 ```bash
-git clone <此模板 URL> your-new-project
-cd your-new-project
-rm -rf .git && git init          # 不保留模板歷史
+# 後端
+cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt
+export MEMORA_DATABASE_URL=postgresql+psycopg://memora:memora@localhost:5432/memora
+export MEMORA_ADMIN_PASSWORD=admin12345
+alembic upgrade head
+uvicorn memora.main:app --reload            # http://localhost:8000/api/docs
+
+# 測試（會清空測試資料庫）
+MEMORA_TEST_DATABASE_URL=postgresql+psycopg://memora:memora@localhost:5432/memora_test pytest
+ruff check . && ruff format --check .
+
+# 前端
+cd frontend
 npm install
+npm run dev                                  # 預設 mock API（Demo Data），admin / admin
+VITE_API_MOCK=false npm run dev              # 接本機後端（/api 轉發到 :8000）
+npm test && npm run typecheck && npm run lint
 ```
 
-- 修改 `package.json` 的 `name`、`.env.*` 的 `VITE_APP_NAME`
-- 修改 `src/features/auth/store.ts`、`src/components/layout/ui-store.ts` 的 persist `name`（localStorage key），避免與其他專案衝突
-- 用不到的範例：刪除 `features/projects/`、`pages/projects.tsx`，並從 `router.tsx`、`config/nav.ts`、`api/mock/index.ts` 移除
+## 功能與 API
 
-## 本機執行
+所有端點在 `/api/v1` 之下，完整規格見 `/api/docs`（OpenAPI）。
 
-```bash
-npm install
-npm run dev          # http://localhost:5173，mock 模式帳號 admin / admin（viewer / viewer 為唯讀）
-npm test             # Vitest
-npm run typecheck
-npm run lint         # oxlint
-npm run build        # 輸出 dist/
-```
-
-## 環境變數
-
-`VITE_` 開頭的變數會**寫進前端 bundle**，不可放任何機密。
-
-| 變數 | 說明 | 開發預設 | 正式預設 |
-|---|---|---|---|
-| `VITE_APP_NAME` | 側欄與登入頁顯示名稱 | `Dashboard` | `Dashboard` |
-| `VITE_API_BASE_URL` | API 前綴 | `/api/v1` | `/api/v1` |
-| `VITE_API_MOCK` | `true` = 使用前端 mock API | `true` | `false` |
-| `VITE_API_TIMEOUT_MS` | 請求逾時 | `15000` | `15000` |
-| `VITE_API_PROXY_TARGET` | 開發時 `/api` 轉發目標（僅 dev server） | `http://localhost:8000` | — |
-
-本機覆寫用 `.env.development.local`（不入版控）。
-
-## 串接後端
-
-1. `.env.development.local`：
-
-```bash
-VITE_API_MOCK=false
-VITE_API_PROXY_TARGET=http://localhost:8000
-```
-
-2. 確認後端提供以下端點（路徑不同時改 `features/*/api.ts`）：
-
-| 方法 | 路徑 | 回應 |
+| 頁面 | 功能 | 主要端點 |
 |---|---|---|
-| `POST` | `/auth/login` | `{ access_token, user }` 或 `{ token, role }` |
-| `GET` | `/auth/me` | `{ id, username, name, email, role }` |
-| `GET` | `/projects?page=&page_size=&q=&sort=&order=&status=` | `{ items, total, page, page_size }` |
-| `GET` / `PATCH` / `DELETE` | `/projects/{id}` | 專案物件 / 204 |
-| `POST` | `/projects`、`/projects/bulk-delete` | 專案物件 / `{ deleted }` |
-| `GET` | `/stats`、`/activity` | 總覽頁資料 |
+| Dashboard | 記憶總數、有效、待審核、API Key、儲存用量、成長趨勢、最近活動、健康狀態（全部來自實際資料） | `GET /stats`、`/activity`、`/health` |
+| Memories | 新增 / 編輯 / 封存 / 刪除、分類、標籤、可信度、到期日、允許讀取的 AI、批次操作、版本歷史 | `GET/POST /memories`、`GET/PATCH/DELETE /memories/{id}`、`GET /memories/{id}/versions`、`POST /memories/bulk` |
+| 搜尋 | 列表篩選、Hybrid / 關鍵字 / 語意搜尋 | `POST /memories/search` |
+| 待審核 | AI 寫入或匯入的記憶，核准 / 拒絕 | `POST /memories/bulk`（activate / reject） |
+| Sources | 每筆記憶的來源與記憶數 | `GET /sources` |
+| Imports | 上傳 → 預覽（重複偵測）→ 匯入 / 取消，錯誤報表下載 | `POST /imports`、`/imports/{id}/commit`、`/cancel`、`GET /imports/{id}/errors.csv` |
+| Developer · API | API Key 建立、撤銷、輪替；端點說明 | `GET/POST /api-keys`、`/api-keys/{id}/revoke`、`/rotate` |
+| Developer · Logs | 操作紀錄（不含記憶內容） | `GET /activity` |
+| Storage | PostgreSQL / pgvector / Embedding 狀態、資料表大小、匯出 | `GET /storage`、`POST /storage/reindex`、`GET /export` |
+| Settings | 系統名稱、語言、時區、新記憶預設可讀 AI、AI 寫入需審核、主題（存在使用者偏好） | `GET/PATCH /settings`、`PATCH /auth/me/preferences` |
 
-3. 回應格式不同時改 `src/api/adapters.ts`：
+Knowledge Graph、AI Connections、MCP 頁面目前標示為 Phase 2 / 3，不顯示假資料。
 
-| 函式 | 用途 |
-|---|---|
-| `toListQuery()` | 列表參數 → query string（例如改成 `limit` / `offset`） |
-| `toPaginated()` | 列表回應 → `{ items, total, page, pageSize }` |
-| `toSession()` / `toUser()` | 登入、使用者資料 |
-| `toErrorMessage()` | 錯誤回應 → 顯示文字（支援 FastAPI 422 驗證錯誤陣列） |
+## 權限模型
 
-串接 Template-PythonFlaskAPI：`VITE_API_BASE_URL` 依其路由前綴調整（例如 `/`），登入回應 `{token, role}` 已相容；其 `/auth/me` 不存在時，移除 `components/layout/app-layout.tsx` 中的 `me` 查詢即可。
-
-## 新增頁面
-
-1. `src/pages/` 建立頁面元件
-2. `src/router.tsx` 加路由，`handle: { crumb: '名稱' }` 會顯示在麵包屑
-3. `src/config/nav.ts` 加側欄項目（`roles` 可限定角色）
-
-## 新增資源（CRUD）
-
-以 `features/projects/` 為範本：
-
-| 檔案 | 內容 |
-|---|---|
-| `schema.ts` | Zod 表單 schema、型別、選項顯示文字 |
-| `api.ts` | query key、`useXxx` / `useSaveXxx` / `useDeleteXxx`（成功後自動 invalidate 與 toast） |
-| `*-form-dialog.tsx` | 新增 / 編輯表單 |
-| `*-detail-sheet.tsx` | 右側詳細面板 |
-| `pages/*.tsx` | 欄位定義 + DataTable + 工具列 |
-| `api/mock/index.ts` | mock 端點（開發用，可選） |
-
-## 資料表格
-
-```tsx
-const { params, update, setExtra } = useListParams({ sort: 'updated_at', filters: ['status'] })
-const query = useProjects(params)
-
-<DataTable
-  tableId="projects"                     // 欄位顯示設定的儲存 key
-  columns={columns}
-  data={query.data?.items}
-  total={query.data?.total ?? 0}
-  params={params}
-  onParamsChange={update}                // 排序、換頁 → 更新網址 → 重新查詢
-  getRowId={(r) => r.id}
-  isLoading={query.isLoading}
-  isFetching={query.isFetching}
-  error={query.error}
-  onRowClick={(r) => setExtra('selected', r.id)}
-  toolbar={(table) => <ViewOptions table={table} />}
-/>
-```
-
-- 網址範例：`/projects?q=api&status=active,paused&sort=name&order=asc&page=2&selected=prj_0017`
-- 除換頁外的任何變更都回到第 1 頁；篩選或換頁後清除勾選，避免誤刪畫面外的資料
-- 欄位：`ColumnHeader`（排序）、`selectionColumn()`（勾選）、`meta.label`（欄位設定選單顯示名稱）
-- 篩選：`FacetedFilter`（多選，值以逗號分隔）
-
-## 登入與權限
-
-- token 存在 `localStorage`（`dashboard:auth`）；請求自動帶 `Authorization: Bearer`
-- 任何請求回 401 → 清除登入狀態並導向 `/login?redirect=...&expired=1`
-- 登入後只會導向站內相對路徑（防 open redirect）
-- `hasRole(user, 'admin', 'operator')` 控制按鈕顯示；`nav.ts` 的 `roles` 控制選單
-- **前端權限只是 UI**，後端仍必須檢查權限
-
-## Docker
+- **UI 使用者**：登入後後端設定 session cookie（`httpOnly`、`SameSite=Strict`、`Path=/api`，網頁 JavaScript 讀不到，XSS 偷不走）；`admin` 可讀寫，`viewer` 唯讀
+  - 寫入請求必須帶 `X-Requested-With: memora`（CSRF 防護），前端 client 自動加上
+  - 登出清除此瀏覽器的 cookie；「登出所有裝置」與改密碼會遞增 token 版本，所有既有 session 立即失效
+  - `Authorization: Bearer` 只接受 API Key，不接受 UI session token
+  - 經 HTTPS 提供服務時設定 `MEMORA_COOKIE_SECURE=true`
+- **API Key**（代表某個 AI，例如 `claude`）：
+  - scope 分開授權：`memories:read`、`memories:write`、`memories:delete`（刪除預設不給）
+  - 只看得到 **status = active** 且「允許讀取的 AI」包含它（或 `*`）的記憶，輸出前再檢查一次
+  - 寫入的記憶預設進入 **待審核**（設定可關閉）；不可修改記憶狀態與權限；不可呼叫管理端點
+  - 修改既有記憶時 **不會直接覆寫**：API 回 `202`，建立一筆「修改提案」（`proposal_for` 指向原記憶），使用者在「待審核」核准後才套用並產生新版本，避免被 prompt injection 的 AI 竄改共用記憶
+  - 只儲存 SHA-256 雜湊，明文只在建立時顯示一次；可撤銷、輪替、設定到期；每分鐘限流（`MEMORA_RATE_LIMIT_PER_MINUTE`）
+- 新記憶預設 **不開放任何 AI 讀取**（最小權限），可在設定中調整預設值
 
 ```bash
-docker compose up -d --build                                  # http://localhost:8080，/api 轉到主機 8000
-API_UPSTREAM=http://api:8000 docker compose up -d --build     # 與後端在同一個 compose
-VITE_API_MOCK=true docker compose up -d --build               # 沒有後端，以 mock 展示
+curl -X POST http://localhost:8080/api/v1/memories/search \
+  -H "Authorization: Bearer mk_..." -H "Content-Type: application/json" \
+  -d '{"query": "回答語言偏好", "limit": 5}'
 ```
 
-- `VITE_*` 是**建置參數**（改了要重新 build）；`API_UPSTREAM` 是執行時環境變數
-- nginx 以 `/etc/nginx/templates/` 機制在啟動時替換 `${API_UPSTREAM}`
+## 搜尋
 
-## 注意事項
+Hybrid Search（`retrieval/search.py`）：
 
-- 安全性較高的做法是後端改用 httpOnly cookie：移除 auth store 的 token，client 改用 `credentials: 'include'`
-- 主 bundle 約 790 KB（gzip 約 240 KB）；頁面變多時可用 React Router 的 `lazy` 拆分路由
-- `src/components/ui/` 可用 `npx shadcn@latest add <元件>` 新增；`react-hooks/incompatible-library` 對 TanStack Table 的警告已在 `data-table.tsx` 註明忽略
+1. 條件篩選：分類、標籤、狀態、權限
+2. 關鍵字：`ILIKE` 子字串（精確區分 `RTX 4090` / `RTX 4080`、版本號、專有名詞）+ 標籤 + `pg_trgm` 相似度
+3. 向量：pgvector cosine 距離（Embedding 啟用時）
+4. RRF 融合排序（關鍵字略加權）
+5. 輸出前權限再確認
+
+Embedding 預設 **disabled**（不送出任何資料）。啟用本機 Ollama：
+
+```bash
+MEMORA_EMBEDDING_PROVIDER=openai
+MEMORA_EMBEDDING_BASE_URL=http://host.docker.internal:11434/v1
+MEMORA_EMBEDDING_MODEL=nomic-embed-text
+```
+
+任何 OpenAI 相容的 `/v1/embeddings` 皆可；向量記錄模型名稱與維度，換模型後到 Storage 按「補建向量」。
+
+## 資料與安全
+
+- 資料表：`users`、`workspaces`、`memories`、`memory_versions`、`memory_tags`、`memory_relations`、`memory_sources`、`ai_connections`、`api_keys`、`access_policies`、`embeddings`、`import_jobs`、`audit_logs`（皆含 `workspace_id`，預留多使用者）
+- 每筆記憶有穩定 ID（`mem_` + ULID）；內容與版本歷史分開；每次修改產生新版本並記錄修改者與原因
+- 重複偵測：正規化內容雜湊（新增、修改、匯入皆檢查）
+- **刪除政策**：刪除記憶會一併刪除版本、標籤、權限、向量與針對它的待審核提案；稽核紀錄只保留 ID；已匯出的檔案與 pg_dump 備份由使用者自行管理
+- 稽核紀錄只記動作、目標 ID 與 metadata，不記完整記憶內容；UI 內的搜尋不記錄，AI 的讀取與搜尋會記錄
+- 登入節流：同一 IP 或帳號 5 分鐘內失敗 10 次即暫時封鎖（`MEMORA_LOGIN_MAX_FAILURES`、`MEMORA_LOGIN_WINDOW_SECONDS`），失敗登入寫入稽核紀錄；nginx 以實際連線 IP 覆寫 `X-Forwarded-For`，避免偽造
+- CSV 匯出與錯誤報表會跳脫 `= + - @` 開頭的儲存格，防止公式注入
+- 匯入任務在完成或取消後清除暫存原文，超過 24 小時未確認的預覽自動取消
+- 密碼上限 72 bytes（bcrypt 限制，超過會拒絕而非截斷）
+- 正式環境 `MEMORA_SECRET_KEY` 未設定或過短時拒絕啟動；服務預設只綁定 127.0.0.1，遠端存取請自行加上 TLS 與防護
+
+### 已知限制（待處理）
+
+- nginx 尚未加上 CSP 等安全標頭；`/api/docs` 為公開
+- 限流與登入節流在單一程序記憶體內，多 worker 部署需改用 Redis
+- 依賴套件使用 `>=` 版本範圍，正式部署建議鎖定版本
+
+## 開發進度
+
+| Phase | 內容 | 狀態 |
+|---|---|---|
+| 1 MVP | Dashboard、Memories CRUD、搜尋、來源、PostgreSQL + pgvector、主題、Docker Compose、匯入 / 匯出、認證與權限 | ✅ |
+| 2 AI 整合 | API Key 與權限 ✅、待審核流程 ✅、MCP Server、AI 連線管理、對話擷取（Extraction） | 進行中 |
+| 3 智慧記憶 | Knowledge Graph、衝突偵測、自動去重 / 合併、智慧摘要、過期策略 | 規劃中 |
+| 4 Developer Platform | Webhooks、進階 Logs、多使用者與團隊、自動備份還原、監控 | 規劃中 |

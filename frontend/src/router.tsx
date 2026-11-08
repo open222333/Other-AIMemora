@@ -13,8 +13,12 @@ const page = <M,>(load: () => Promise<M>, name: keyof M) => async () => ({ Compo
 const memories = () => import('@/pages/memories')
 const soon = () => import('@/pages/coming-soon')
 
+const guide = () => import('@/pages/guide')
+
 export const routes = [
   { path: '/login', element: <LoginPage /> },
+  // 公開的使用教學（不需登入），從登入頁連結
+  { path: '/guide', lazy: page(guide, 'PublicGuidePage') },
   {
     path: '/',
     element: <AppLayout />,
@@ -47,6 +51,7 @@ export const routes = [
       },
       { path: 'storage', lazy: page(() => import('@/pages/storage'), 'StoragePage'), handle: { crumb: 'Storage' } },
       { path: 'settings', lazy: page(() => import('@/pages/settings'), 'SettingsPage'), handle: { crumb: 'Settings' } },
+      { path: 'help', lazy: page(guide, 'HelpPage'), handle: { crumb: '使用教學' } },
       { path: '*', element: <NotFoundPage />, handle: { crumb: '找不到頁面' } },
     ],
   },

@@ -3,6 +3,7 @@ import {
   Brain,
   CheckCircle2,
   CircleAlert,
+  Code2,
   Clock,
   Database,
   HardDrive,
@@ -90,6 +91,22 @@ export function DashboardPage() {
         </p>
       )}
 
+      {s && s.total === 0 && (
+        <Card className="border-primary/40 bg-accent/30">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="font-medium">第一次使用 MEMORA？</div>
+              <div className="text-muted-foreground text-sm">花 5 分鐘看完使用教學：新增記憶、設定 AI 可讀範圍、建立 API Key。</div>
+            </div>
+            <Button asChild>
+              <Link to="/help">
+                <BookOpen /> 開始使用教學
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {stats.error ? (
         <Card>
           <ErrorState error={stats.error} onRetry={() => stats.refetch()} />
@@ -148,8 +165,13 @@ export function DashboardPage() {
             ))}
             <Button variant="outline" className="justify-start" asChild>
               <a href="/api/docs" target="_blank" rel="noreferrer">
-                <BookOpen /> Open API Docs
+                <Code2 /> Open API Docs
               </a>
+            </Button>
+            <Button variant="outline" className="justify-start" asChild>
+              <Link to="/help">
+                <BookOpen /> 使用教學
+              </Link>
             </Button>
           </CardContent>
         </Card>

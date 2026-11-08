@@ -4,6 +4,8 @@
 
 自架式的跨 AI 共用記憶平台：使用者擁有一份長期記憶，ChatGPT、Claude、Gemini、DeepSeek 或本地模型在授權範圍內讀取與更新它。
 
+**使用教學**：[frontend/src/content/user-guide.md](frontend/src/content/user-guide.md)，也可在 Web UI 閱讀（登入頁「查看使用教學」→ `/guide`，登入後側欄「使用教學」→ `/help`）。
+
 目前進度：**Phase 1（MVP：核心記憶系統）**，並先提供 Phase 2 的 API Key 存取。產品規格見 [docs/MEMORA_UI_UX_產品規劃與開發規格.md](docs/MEMORA_UI_UX_產品規劃與開發規格.md)。
 
 ## 目錄

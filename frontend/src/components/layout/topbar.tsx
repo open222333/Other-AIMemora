@@ -1,4 +1,4 @@
-import { ChevronRight, LogOut, Menu, Monitor, Moon, Search, Settings, Sun } from 'lucide-react'
+import { ChevronRight, CircleHelp, LogOut, Menu, Monitor, Moon, Search, Settings, Sun } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useMatches, useNavigate } from 'react-router'
 
@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useThemePreference } from '@/features/auth/preferences'
 import { logout } from '@/features/auth/api'
 import { useAuth } from '@/features/auth/store'
@@ -78,6 +79,16 @@ export function Topbar({ onOpenCommand }: { onOpenCommand: () => void }) {
         <Button variant="ghost" size="icon-sm" className="sm:hidden" onClick={onOpenCommand} aria-label="搜尋">
           <Search />
         </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon-sm" aria-label="使用教學" asChild>
+              <Link to="/help">
+                <CircleHelp />
+              </Link>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>使用教學</TooltipContent>
+        </Tooltip>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon-sm" aria-label="主題">
@@ -114,6 +125,9 @@ export function Topbar({ onOpenCommand }: { onOpenCommand: () => void }) {
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => navigate('/settings')}>
               <Settings /> 設定
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate('/help')}>
+              <CircleHelp /> 使用教學
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => {

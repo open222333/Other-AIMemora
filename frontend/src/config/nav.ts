@@ -1,5 +1,6 @@
 /** 側欄導覽設定：新增頁面 → 在 router.tsx 加路由、在這裡加項目 */
 import {
+  BookOpen,
   Brain,
   Code2,
   Database,
@@ -64,6 +65,7 @@ export const NAV: NavGroup[] = [
     items: [
       { title: 'Storage', url: '/storage', icon: HardDrive },
       { title: 'Settings', url: '/settings', icon: Settings },
+      { title: '使用教學', url: '/help', icon: BookOpen },
     ],
   },
 ]

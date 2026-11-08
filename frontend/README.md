@@ -71,6 +71,7 @@ Template-ReactDashboard/
 │   │   ├── memories/             # 記憶：schema、api、表單、Inspector、badge
 │   │   ├── imports/              # 匯入流程
 │   │   └── system/               # 設定、健康、儲存、來源、稽核、API Key
+│   ├── content/                  # 使用教學 user-guide.md（/guide、/help 共用）
 │   ├── pages/                    # 路由頁面
 │   ├── components/
 │   │   ├── ui/                   # shadcn/ui 元件

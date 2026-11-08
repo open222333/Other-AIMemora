@@ -1,8 +1,8 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation } from '@tanstack/react-query'
-import { Loader2 } from 'lucide-react'
+import { BookOpen, Loader2 } from 'lucide-react'
 import { useForm } from 'react-hook-form'
-import { Navigate, useNavigate, useSearchParams } from 'react-router'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router'
 import { z } from 'zod'
 
 import { Button } from '@/components/ui/button'
@@ -86,6 +86,12 @@ export function LoginPage() {
               登入
             </Button>
           </form>
+          <div className="text-muted-foreground mt-6 border-t pt-4 text-center text-sm">
+            第一次使用？{' '}
+            <Link to="/guide" className="text-primary inline-flex items-center gap-1 font-medium underline-offset-4 hover:underline">
+              <BookOpen className="size-3.5" /> 查看使用教學
+            </Link>
+          </div>
         </CardContent>
       </Card>
     </div>
